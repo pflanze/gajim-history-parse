@@ -130,7 +130,8 @@ sub merge($vs1, $vs2) {
             my ($a, $b) = ($vs1->first, $vs2->first);
             if ($a->content eq $b->content) {
                 my $rest = merge($vs1->rest, $vs2->rest);
-                cons $a, $rest
+                my $v = ($a->unixtime < $b->unixtime) ? $a : $b;
+                cons $v, $rest
             } else {
                 if ($a->unixtime < $b->unixtime) {
                     cons $a, merge($vs1->rest, $vs2)
