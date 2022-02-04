@@ -11,9 +11,14 @@ use warnings;
 use warnings FATAL => 'uninitialized';
 use experimental 'signatures';
 
+use Date::Parse ();
 use Chj::xperlfunc ":all";
+use Chj::xopen qw(possibly_fh_to_fh);
+use FP::Ops qw(the_method);
 use FP::List;
 use FP::Lazy;
+use FP::Text::CSV qw(rows_to_csv_fh
+                     rows_to_csv_file);
 
 use Getopt::Long;
 # use FP::Repl::Trap; #
@@ -28,12 +33,10 @@ BEGIN {
 
 sub usage {
     print STDERR map{"$_\n"} @_ if @_;
-    print "$myname file(s)
+    print "$myname file1 [file2]
 
-  Options:
-
-    --print   just print each file in the new format
-    --merge   merge then print
+  Reformat as tab-separated CSV file; if 2 files are given, merge
+  them.
 
   ($email_full)
 ";
@@ -41,15 +44,14 @@ exit (@_ ? 1 : 0);
 }
 
 our $verbose=0;
-our $opt_print;
+#our $opt_print;
 GetOptions("verbose"=> \$verbose,
 	   "help"=> sub{usage},
-	   "print"=> \$opt_print,
+	   #"print"=> \$opt_print,
 	   ) or exit 1;
 usage unless @ARGV;
 
 
-use Date::Parse ();
 
 sub unixtime($str) {
     Date::Parse::str2time($str) // die "bogus date: '$str'"
@@ -68,22 +70,28 @@ my $uniform_name = sub($str) {
 };
 
 package Item {
+    use FP::List;
 
-    sub prep($time, $name, $str) {
-        my $is_continuation = 0;
-        map {
-            my $C = $is_continuation ? "..." : "";
-            $is_continuation = 1;
-            "$time\t$name\t$C\t$_\n"
-        } split /\n/, main::trimboth($str)
+    sub multirow($time, $name, $str, $tail) {
+        my @rlines = reverse split /\n/, main::trimboth($str);
+        while (@rlines) {
+            my $line = shift @rlines;
+            my $C = @rlines ? "..." : "";
+            $tail = cons [ $time, $name, $C, $line ], $tail
+        }
+        $tail
     }
 
     use FP::Struct [ "unixtime", "name", "datestr", "content" ]
         => "FP::Struct::Show", "FP::Struct::Equal";
 
-    sub myprintvals($self) {
-        prep($self->unixtime, $uniform_name->($self->name), $self->content)
+    sub cons_rows($self, $tail) {
+        multirow($self->unixtime,
+                 $uniform_name->($self->name),
+                 $self->content,
+                 $tail)
     }
+
     _END_
 }
 Item::constructors->import;
@@ -101,15 +109,15 @@ sub parse($path) {
     list @items
 }
 
-binmode *STDOUT{IO}, ":encoding(utf-8)" or die;
+my $out = possibly_fh_to_fh(*STDOUT{IO});
+$out->xbinmode(":encoding(utf-8)");
 
 my @itemss = map { parse $_ } @ARGV;
 
 sub printstream($items) {
-    $items->for_each(
-        sub ($p) {
-            xprint $p->myprintvals;
-        });
+    my $rows = $items->fold_right(the_method("cons_rows"), list());
+    # use FP::Repl; repl;
+    rows_to_csv_fh($rows, $out, +{sep_char => "\t", eol=> "\n" });
 }
 
 sub merge($vs1, $vs2) {
@@ -134,14 +142,13 @@ sub merge($vs1, $vs2) {
     }
 }
 
-if ($opt_print) {
+if (@itemss == 1) {
     for my $items (@itemss) {
         printstream $items;
     }
 } else {
     @itemss == 2 or die "can only handle 2 files to merge for now";
     my $s = merge (@itemss);
-    use FP::Repl; repl;
     printstream $s;
 }
 
