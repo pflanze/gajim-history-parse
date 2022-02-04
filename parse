@@ -33,10 +33,13 @@ BEGIN {
 
 sub usage {
     print STDERR map{"$_\n"} @_ if @_;
-    print "Usage: $myname file1 [file2]
+    print "Usage: $myname file(s)
 
-  Reformat as tab-separated CSV file; if 2 files are given, merge
-  them.
+  Print reformatted as tab-separated CSV file (messages are split into
+  multiple rows on newlines, column C contains '...' for continuation
+  rows), with the time stamp reformatted as unix time. If multiple
+  files are given, merge them. When merging, the oldest time stamp of
+  all copies of the same message is used.
 
   Options:
     --repl
@@ -151,15 +154,6 @@ if ($opt_repl) {
     # use FP::Repl; repl;
     require FP::Repl; FP::Repl::repl();
 } else {
-
-    if (@itemss == 1) {
-        for my $items (@itemss) {
-            printstream $items;
-        }
-    } else {
-        @itemss == 2 or die "can only handle 2 files to merge for now";
-        my $s = merge (@itemss);
-        printstream $s;
-    }
-
+    my $s = list(@itemss)->reduce(\&merge);
+    printstream $s;
 }
