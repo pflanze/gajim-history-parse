@@ -37,9 +37,10 @@ sub usage {
 
   Print reformatted as tab-separated CSV file (messages are split into
   multiple rows on newlines, column C contains '...' for continuation
-  rows), with the time stamp reformatted as unix time. If multiple
-  files are given, merge them. When merging, the oldest time stamp of
-  all copies of the same message is used.
+  rows), with the time stamp reformatted as unix time (use
+  'unix2localtime' from chj-bin to see them as local time). If
+  multiple files are given, merge them. When merging, the oldest time
+  stamp of all copies of the same message is used.
 
   Options:
     --repl
