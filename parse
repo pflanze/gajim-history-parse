@@ -1,0 +1,109 @@
+#!/usr/bin/env perl
+
+my $copyright= <<'COPYRIGHT';
+# Copyright 2022 by Christian Jaeger <ch@christianjaeger.ch>
+# Published under the same terms as perl itself
+COPYRIGHT
+
+use strict;
+use utf8;
+use warnings;
+use warnings FATAL => 'uninitialized';
+use experimental 'signatures';
+
+use Chj::xperlfunc ":all";
+
+use Getopt::Long;
+# use FP::Repl::Trap; #
+
+my ($email_full)= $copyright=~ / by ([^\n]*)/s;
+
+my ($mydir, $myname);
+BEGIN {
+    $0=~ /(.*?)([^\/]+)\z/s or die "?";
+    ($mydir, $myname)=($1,$2);
+}
+
+sub usage {
+    print STDERR map{"$_\n"} @_ if @_;
+    print "$myname file(s)
+
+  ($email_full)
+";
+exit (@_ ? 1 : 0);
+}
+
+our $verbose=0;
+#our $opt_dry;
+GetOptions("verbose"=> \$verbose,
+	   "help"=> sub{usage},
+	   #"dry-run"=> \$opt_dry,
+	   ) or exit 1;
+usage unless @ARGV;
+
+my $uniform_name = sub($str) {
+    # $str=~ s/_//sg;
+    # actually seems to be using same way on both ends
+    $str
+};
+
+package Item {
+    sub trimboth($str) {
+        $str=~ s/^\s+//s;
+        $str=~ s/\s+\z//s;
+        $str
+    }
+
+    sub prep($time, $name, $str) {
+        my $is_continuation = 0;
+        map {
+            my $C = $is_continuation ? "..." : "";
+            $is_continuation = 1;
+            "$time\t$name\t$C\t$_\n"
+        } split /\n/, trimboth $str
+    }
+
+    use Date::Parse ();
+
+    use FP::Struct ["name", "datestr", "content"]
+        => "FP::Struct::Show", "FP::Struct::Equal";
+
+    sub unixtime($self) {
+        Date::Parse::str2time($self->datestr) // die "bogus date"
+    }
+    
+    sub myprintvals($self) {
+        prep($self->unixtime, $uniform_name->($self->name), $self->content)
+    }
+    _END_
+}
+Item::constructors->import;
+
+sub parse($path) {
+    my $s = xgetfile_utf8 $path;
+    my @items;
+    while ($s=~ m/\G\n?(\w+) on ([^\n]*?) said:(.*?)(\s*$|\n\w+ on [^\n]*? said:)/sgc) {
+        push @items, Item($1, $2, $3);
+        my $after = $4;
+        last if $after =~ /^\s*\z/s;
+        pos($s) -= length $after;
+    }
+    \@items
+}
+
+my @itemss = map { parse $_ } @ARGV;
+
+binmode *STDOUT{IO}, ":encoding(utf-8)" or die;
+
+for my $items (@itemss) {
+    for my $p (@$items) {
+        xprint $p->myprintvals;
+    }
+}
+
+
+#use FP::Repl; repl;
+
+#use Chj::ruse;
+#use Chj::Backtrace; 
+
