@@ -33,10 +33,13 @@ BEGIN {
 
 sub usage {
     print STDERR map{"$_\n"} @_ if @_;
-    print "$myname file1 [file2]
+    print "Usage: $myname file1 [file2]
 
   Reformat as tab-separated CSV file; if 2 files are given, merge
   them.
+
+  Options:
+    --repl
 
   ($email_full)
 ";
@@ -44,10 +47,10 @@ exit (@_ ? 1 : 0);
 }
 
 our $verbose=0;
-#our $opt_print;
+our $opt_repl;
 GetOptions("verbose"=> \$verbose,
 	   "help"=> sub{usage},
-	   #"print"=> \$opt_print,
+	   "repl"=> \$opt_repl,
 	   ) or exit 1;
 usage unless @ARGV;
 
@@ -112,11 +115,8 @@ sub parse($path) {
 my $out = possibly_fh_to_fh(*STDOUT{IO});
 $out->xbinmode(":encoding(utf-8)");
 
-my @itemss = map { parse $_ } @ARGV;
-
 sub printstream($items) {
     my $rows = $items->fold_right(the_method("cons_rows"), list());
-    # use FP::Repl; repl;
     rows_to_csv_fh($rows, $out, +{sep_char => "\t", eol=> "\n" });
 }
 
@@ -145,17 +145,21 @@ sub merge($vs1, $vs2) {
     }
 }
 
-if (@itemss == 1) {
-    for my $items (@itemss) {
-        printstream $items;
-    }
+my @itemss = map { parse $_ } @ARGV;
+
+if ($opt_repl) {
+    # use FP::Repl; repl;
+    require FP::Repl; FP::Repl::repl();
 } else {
-    @itemss == 2 or die "can only handle 2 files to merge for now";
-    my $s = merge (@itemss);
-    printstream $s;
+
+    if (@itemss == 1) {
+        for my $items (@itemss) {
+            printstream $items;
+        }
+    } else {
+        @itemss == 2 or die "can only handle 2 files to merge for now";
+        my $s = merge (@itemss);
+        printstream $s;
+    }
+
 }
-
-
-#use Chj::ruse;
-#use Chj::Backtrace; 
-
