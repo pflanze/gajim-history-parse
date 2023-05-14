@@ -106,13 +106,27 @@ Item::constructors->import;
 sub parse($path) {
     my $s = xgetfile_utf8 $path;
     my @items;
-    while ($s=~ m/\G\n?(\S+) on ([^\n]*) said:(.*?)(\s*$|\n\S+ on [^\n]* said:)/sgc) {
-        my ($name, $datestr, $content, $after) = ($1, $2, $3, $4);
-        push @items, Item(unixtime($datestr), $name, $datestr,
-                          trimboth($content));
-        last if $after =~ /^\s*\z/s;
-        pos($s) -= length $after;
+    my $maybe_start; my @content;
+    my $possibly_pushover = sub () {
+        if (defined $maybe_start) {
+            my ($name, $datestr, $content1) = @$maybe_start;
+            my $content = join("\n", $content1, @content);
+            push @items, Item(unixtime($datestr), $name, $datestr,
+                              trimboth($content));
+            $maybe_start = undef;
+            @content = ();
+        }
+    };
+    for my $line (split /\n/, $s) {
+        if (my ($_name, $_datestr, $_content1) = $line=~ m/^(\S+) on (.*) said: ?(.*)/s)
+        {
+            $possibly_pushover->();
+            $maybe_start = [($_name, $_datestr, $_content1)];
+        } else {
+            push @content, $line
+        }
     }
+    $possibly_pushover->();
     list @items
 }
 
