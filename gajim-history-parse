@@ -106,7 +106,7 @@ Item::constructors->import;
 sub parse($path) {
     my $s = xgetfile_utf8 $path;
     my @items;
-    while ($s=~ m/\G\n?(\S+) on ([^\n]*?) said:(.*?)(\s*$|\n\S+ on [^\n]*? said:)/sgc) {
+    while ($s=~ m/\G\n?(\S+) on ([^\n]*) said:(.*?)(\s*$|\n\S+ on [^\n]* said:)/sgc) {
         my ($name, $datestr, $content, $after) = ($1, $2, $3, $4);
         push @items, Item(unixtime($datestr), $name, $datestr,
                           trimboth($content));
