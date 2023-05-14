@@ -146,12 +146,21 @@ sub merge($vs1, $vs2) {
     } else {
         lazy {
             my ($a, $b) = ($vs1->first, $vs2->first);
-            if ($a->content eq $b->content
-                and
-                $a->name eq $b->name) {
-                my $rest = merge($vs1->rest, $vs2->rest);
-                my $v = ($a->unixtime < $b->unixtime) ? $a : $b;
-                cons $v, $rest
+            if (0) {
+                # stupid duplicate removal, why even?
+                if ($a->content eq $b->content
+                    and
+                    $a->name eq $b->name) {
+                    my $rest = merge($vs1->rest, $vs2->rest);
+                    my $v = ($a->unixtime < $b->unixtime) ? $a : $b;
+                    cons $v, $rest
+                } else {
+                    if ($a->unixtime < $b->unixtime) {
+                        cons $a, merge($vs1->rest, $vs2)
+                    } else {
+                        cons $b, merge($vs1, $vs2->rest)
+                    }
+                }
             } else {
                 if ($a->unixtime < $b->unixtime) {
                     cons $a, merge($vs1->rest, $vs2)
